@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <iostream>
 
+const float PI = 3.14159265358979f;
+
 class vec3 {
 public:
     vec3() {}

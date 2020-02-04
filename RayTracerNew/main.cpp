@@ -27,18 +27,31 @@ vec3 color(const ray& r, hitable* world, int depth) {
 }
 int main() 
 {
+	float fov = 20;
 	std::ofstream my_Image("image.ppm");
 	int nx = 200;
 	int ny = 100;
 	int ns = 100;
-	hitable* list[5];
+
+	vec3 lookfrom(2, 3, 2);
+	vec3 lookat(0, 0, -1);
+	float dist_to_focus = (lookfrom - lookat).length();
+	float aperture = 0.0;
+
+	camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
+		float(nx) / float(ny), aperture, dist_to_focus);
+
+	hitable* list[4];
+	//float R = cos(PI / 4);
+	//list[0] = new sphere(vec3(-R, 0, -1), R, new lambertian(vec3(0, 0, 1)));
+	//list[1] = new sphere(vec3(R, 0, -1), R, new lambertian(vec3(1, 0, 0)));
+	//hitable* world = new hitable_list(list, 2);
 	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
 	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
-	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2),0.0f));
+	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2),0.1f));
 	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
-	list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
-	hitable* world = new hitable_list(list, 5);
-	camera cam;
+	//list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
+	hitable* world = new hitable_list(list, 4);
 	std::vector<vec3> pixels;
 
 	if (my_Image.is_open()) 
@@ -90,6 +103,11 @@ int main()
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
+
+			//if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+			//{
+			//	fov++;
+			//}
 		}
 
 		window.clear();
