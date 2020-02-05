@@ -3,11 +3,13 @@
 #include <fstream>
 #include "sphere.h"
 #include "hittablelist.h"
+#include "moving_sphere.h"
 #include "float.h"
 #include "camera.h"
 #include "material.h"
+#include "bvh.h"
 
-vec3 color(const ray& r, hitable* world, int depth) {
+vec3 color(const ray& r, hittable* world, int depth) {
 	hit_record rec;
 	if (world->hit(r, 0.001, FLT_MAX, rec)) {
 		ray scattered;
@@ -25,9 +27,35 @@ vec3 color(const ray& r, hitable* world, int depth) {
 		return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 	}
 }
+
+hittable* two_spheres() {
+	//texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
+	int n = 2;
+	hittable** list = new hittable * [n + 1];
+	list[0] = new sphere(vec3(0, -10, 0), 10, new lambertian(vec3(0.8, 0.8, 0.0)));
+	list[1] = new sphere(vec3(0, 10, 0), 10, new lambertian(vec3(0.8, 0.8, 0.0)));
+
+	return new hittable_list(list, 2);
+}
+
+hittable* random_scene() {
+	int n = 5;
+	hittable** list = new hittable * [n + 1];
+	//texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
+	list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(vec3(0.1, 0.2, 0.5)));
+	int i = 1;
+
+	list[i++] = new sphere(vec3(0, 1, 0), 1.0, new dielectric(1.5));
+	list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(vec3(0.1, 0.2, 0.5)));
+	list[i++] = new sphere(vec3(4, 1, 0), 1.0, new metal(vec3(0.7, 0.6, 0.5), 0.0));
+
+	//return new hittable_list(list,i);
+	return new bvh_node(list, i, 0.0, 1.0);
+}
+
 int main() 
 {
-	float fov = 20;
+	float fov = 100;
 	std::ofstream my_Image("image.ppm");
 	int nx = 200;
 	int ny = 100;
@@ -35,13 +63,13 @@ int main()
 
 	vec3 lookfrom(2, 3, 2);
 	vec3 lookat(0, 0, -1);
-	float dist_to_focus = (lookfrom - lookat).length();
+	float dist_to_focus = 10.0f;
 	float aperture = 0.0;
 
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
-		float(nx) / float(ny), aperture, dist_to_focus);
+		float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
 
-	hitable* list[4];
+	hittable** list = new hittable*[5];
 	//float R = cos(PI / 4);
 	//list[0] = new sphere(vec3(-R, 0, -1), R, new lambertian(vec3(0, 0, 1)));
 	//list[1] = new sphere(vec3(R, 0, -1), R, new lambertian(vec3(1, 0, 0)));
@@ -51,7 +79,8 @@ int main()
 	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2),0.1f));
 	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
 	//list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
-	hitable* world = new hitable_list(list, 4);
+	hittable* world = random_scene();
+	//hittable* world = two_spheres();
 	std::vector<vec3> pixels;
 
 	if (my_Image.is_open()) 
@@ -66,6 +95,7 @@ int main()
 					float u = float(i + random_double()) / float(nx);
 					float v = float(j + random_double()) / float(ny);
 					ray r = cam.get_ray(u, v);
+					vec3 p = r.point_at_parameter(2.0);
 					col += color(r, world, 0);
 				}
 
