@@ -1,6 +1,7 @@
 #pragma once
 #ifndef MATERIALH
 #define MATERIALH
+#include "texture.h"
 #include "hittable.h"
 #include "random.h"
 
@@ -39,15 +40,15 @@ float schlick(float cosine, float ref_idx) {
 
 class lambertian : public material {
 public:
-    lambertian(const vec3& a) : albedo(a) {}
+    lambertian(texture* a) : albedo(a) {}
     virtual bool scatter(const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered) const {
         vec3 target = rec.p + rec.normal + random_in_unit_sphere();
         scattered = ray(rec.p, target - rec.p, r_in.time());
-        attenuation = albedo;
+        attenuation = albedo->value(rec.u, rec.v, rec.p);
         return true;
     }
 
-    vec3 albedo;
+    texture* albedo;
 };
 
 vec3 reflect(const vec3& v, const vec3& n) {

@@ -1,6 +1,9 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <fstream>
+#include <thread>
+#include <atomic>
+#include <future>
 #include "sphere.h"
 #include "hittablelist.h"
 #include "moving_sphere.h"
@@ -8,6 +11,7 @@
 #include "camera.h"
 #include "material.h"
 #include "bvh.h"
+#include "stb_image.h"
 
 vec3 color(const ray& r, hittable* world, int depth) {
 	hit_record rec;
@@ -28,25 +32,53 @@ vec3 color(const ray& r, hittable* world, int depth) {
 	}
 }
 
-hittable* two_spheres() {
-	//texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
-	int n = 2;
-	hittable** list = new hittable * [n + 1];
-	list[0] = new sphere(vec3(0, -10, 0), 10, new lambertian(vec3(0.8, 0.8, 0.0)));
-	list[1] = new sphere(vec3(0, 10, 0), 10, new lambertian(vec3(0.8, 0.8, 0.0)));
+hittable* earth() {
+	int nx, ny, nn;
 
-	return new hittable_list(list, 2);
+	unsigned char* tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
+	material* mat = new lambertian(new image_texture(tex_data, nx, ny));
+	return new sphere(vec3(0, 0, 0), 2, mat);
+}
+
+hittable* two_spheres() {
+	texture* checker = new checker_texture(
+		new constant_texture(vec3(0.2, 0.3, 0.1)),
+		new constant_texture(vec3(0.9, 0.9, 0.9))
+	);
+	int n = 50;
+	hittable** list = new hittable * [n + 1];
+	list[0] = new sphere(vec3(0, -10, 0), 10, new lambertian(checker));
+	list[1] = new sphere(vec3(0, 10, 0), 10, new lambertian(checker));
+	return new bvh_node(list, 2, 0, 1);
 }
 
 hittable* random_scene() {
-	int n = 5;
+	int n = 50000;
 	hittable** list = new hittable * [n + 1];
-	//texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
-	list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(vec3(0.1, 0.2, 0.5)));
+	texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
+	list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(checker));
 	int i = 1;
+	for (int a = -10; a < 10; a++) {
+		for (int b = -10; b < 10; b++) {
+			float choose_mat = random_double();
+			vec3 center(a + 0.9 * random_double(), 0.2, b + 0.9 * random_double());
+			if ((center - vec3(4, 0.2, 0)).length() > 0.9) {
+				if (choose_mat < 0.8) {  // diffuse
+					list[i++] = new moving_sphere(center, center + vec3(0, 0.5 * random_double(), 0), 0.0, 1.0, 0.2, new lambertian(new constant_texture(vec3(random_double() * random_double(), random_double() * random_double(), random_double() * random_double()))));
+				}
+				else if (choose_mat < 0.95) { // metal
+					list[i++] = new sphere(center, 0.2,
+						new metal(vec3(0.5 * (1 + random_double()), 0.5 * (1 + random_double()), 0.5 * (1 + random_double())), 0.5 * random_double()));
+				}
+				else {  // glass
+					list[i++] = new sphere(center, 0.2, new dielectric(1.5));
+				}
+			}
+		}
+	}
 
 	list[i++] = new sphere(vec3(0, 1, 0), 1.0, new dielectric(1.5));
-	list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(vec3(0.1, 0.2, 0.5)));
+	list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
 	list[i++] = new sphere(vec3(4, 1, 0), 1.0, new metal(vec3(0.7, 0.6, 0.5), 0.0));
 
 	//return new hittable_list(list,i);
@@ -55,13 +87,19 @@ hittable* random_scene() {
 
 int main() 
 {
-	float fov = 100;
-	std::ofstream my_Image("image.ppm");
-	int nx = 200;
-	int ny = 100;
-	int ns = 100;
 
-	vec3 lookfrom(2, 3, 2);
+	float fov = 30;
+	std::ofstream my_Image("image.ppm");
+	int nx = 400;
+	int ny = 200;
+	int ns = 200;
+
+	std::size_t max = nx * ny * ns;
+	std::size_t cores = std::thread::hardware_concurrency();
+	volatile std::atomic<std::size_t> count(0);
+	std::vector<std::future<void>> future_vector;
+
+	vec3 lookfrom(2, 3, 10);
 	vec3 lookat(0, 0, -1);
 	float dist_to_focus = 10.0f;
 	float aperture = 0.0;
@@ -69,19 +107,26 @@ int main()
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
 		float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
 
-	hittable** list = new hittable*[5];
-	//float R = cos(PI / 4);
-	//list[0] = new sphere(vec3(-R, 0, -1), R, new lambertian(vec3(0, 0, 1)));
-	//list[1] = new sphere(vec3(R, 0, -1), R, new lambertian(vec3(1, 0, 0)));
-	//hitable* world = new hitable_list(list, 2);
-	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
-	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
-	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2),0.1f));
-	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
-	//list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
-	hittable* world = random_scene();
+
+	hittable* world = earth();
 	//hittable* world = two_spheres();
 	std::vector<vec3> pixels;
+
+	//while (cores--)
+	//	future_vector.emplace_back(
+	//		std::async([=, &world, &count]()
+	//			{
+	//				while (true)
+	//				{
+	//					std::size_t index = count++;
+	//					if (index >= max)
+	//						break;
+	//					std::size_t x = index % nx;
+	//					std::size_t y = index / ny;
+	//					...
+	//						pixel[index] = color(r, world, 0);
+	//				}
+	//			}));
 
 	if (my_Image.is_open()) 
 	{
@@ -144,10 +189,6 @@ int main()
 		window.draw(pointmap);
 		window.display();
 	}
-	delete list[0];
-	delete list[1];
-	delete list[2];
-	delete list[3];
 	delete world;
 	return 0;
 }
