@@ -1,9 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <fstream>
-#include <thread>
-#include <atomic>
-#include <future>
 #include "sphere.h"
 #include "hittablelist.h"
 #include "moving_sphere.h"
@@ -12,6 +9,12 @@
 #include "material.h"
 #include "bvh.h"
 #include "stb_image.h"
+
+#include <thread>
+#include <vector>
+#include <mutex>
+#include <atomic>
+#include <future>
 
 vec3 color(const ray& r, hittable* world, int depth) {
 	hit_record rec;
@@ -85,91 +88,169 @@ hittable* random_scene() {
 	return new bvh_node(list, i, 0.0, 1.0);
 }
 
+struct BlockJob
+{
+	int rowStart;
+	int rowEnd;
+	int colSize;
+	int spp;
+	std::vector<int> indices;
+	std::vector<vec3> colors;
+};
+
+void CalculateColor(BlockJob job, std::vector<BlockJob>& imageBlocks, int ny, camera cam, hittable* world,
+	std::mutex& mutex, std::condition_variable& cv, std::atomic<int>& completedThreads)
+{
+	for (int j = job.rowStart; j < job.rowEnd; ++j) {
+		for (int i = 0; i < job.colSize; ++i) {
+			vec3 col(0, 0, 0);
+			for (int s = 0; s < job.spp; ++s) {
+				float u = float(i + random_double()) / float(job.colSize);
+				float v = float(j + random_double()) / float(ny);
+				ray r = cam.get_ray(u, v);
+				col += color(r, world, 0);
+			}
+			col /= float(job.spp);
+			col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+
+			const unsigned int index = j * job.colSize + i;
+			job.indices.push_back(index);
+			job.colors.push_back(col);
+		}
+	}
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		imageBlocks.push_back(job);
+		completedThreads++;
+		cv.notify_one();
+	}
+}
+
 int main() 
 {
 
-	float fov = 30;
-	std::ofstream my_Image("image.ppm");
-	int nx = 400;
-	int ny = 200;
-	int ns = 200;
-
-	std::size_t max = nx * ny * ns;
-	std::size_t cores = std::thread::hardware_concurrency();
-	volatile std::atomic<std::size_t> count(0);
-	std::vector<std::future<void>> future_vector;
+	float fov = 20.0f;
+	//std::ofstream my_Image("image.ppm");
+	int nx = 1200;
+	int ny = 800;
+	int ns = 10;
+	int pixelCount = nx * ny;
+	hittable* world = random_scene();
 
 	vec3 lookfrom(2, 3, 10);
-	vec3 lookat(0, 0, -1);
+	vec3 lookat(0, 0, -1); //original is (0, 0, -1);
 	float dist_to_focus = 10.0f;
-	float aperture = 0.0;
+	float aperture = 0.1f;
+
+	vec3* image = new vec3[pixelCount];
+	memset(&image[0], 0, pixelCount * sizeof(vec3));
 
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
 		float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
 
+	//camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
+	//	float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
 
-	hittable* world = earth();
-	//hittable* world = two_spheres();
-	std::vector<vec3> pixels;
 
-	//while (cores--)
-	//	future_vector.emplace_back(
-	//		std::async([=, &world, &count]()
-	//			{
-	//				while (true)
-	//				{
-	//					std::size_t index = count++;
-	//					if (index >= max)
-	//						break;
-	//					std::size_t x = index % nx;
-	//					std::size_t y = index / ny;
-	//					...
-	//						pixel[index] = color(r, world, 0);
-	//				}
-	//			}));
+	auto fulltime = std::chrono::high_resolution_clock::now();
 
-	if (my_Image.is_open()) 
+	const int nThreads = std::thread::hardware_concurrency();
+	int rowsPerThread = ny / nThreads;
+	int leftOver = ny % nThreads;
+
+	std::mutex mutex;
+	std::condition_variable cvResults;
+	std::vector<BlockJob> imageBlocks;
+	std::atomic<int> completedThreads = { 0 };
+	std::vector<std::thread> threads;
+
+	for (int i = 0; i < nThreads; ++i)
 	{
-		my_Image << "P3\n" << nx << " " << ny << "\n255\n";
-		for (int j = ny - 1; j >= 0; j--)
+		BlockJob job;
+		job.rowStart = i * rowsPerThread;
+		job.rowEnd = job.rowStart + rowsPerThread;
+		if (i == nThreads - 1)
 		{
-			for (int i = 0; i < nx; i++)
-			{
-				vec3 col(0, 0, 0);
-				for (int s = 0; s < ns; s++) {
-					float u = float(i + random_double()) / float(nx);
-					float v = float(j + random_double()) / float(ny);
-					ray r = cam.get_ray(u, v);
-					vec3 p = r.point_at_parameter(2.0);
-					col += color(r, world, 0);
-				}
-
-				col /= float(ns);
-				col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-				int ir = int(255.99 * col[0]);
-				int ig = int(255.99 * col[1]);
-				int ib = int(255.99 * col[2]);
-
-				vec3 temp(ir, ig, ib);
-				pixels.push_back(temp);
-
-				my_Image << ir << " " << ig << " " << ib << "\n";
-			}
+			job.rowEnd = job.rowStart + rowsPerThread + leftOver;
 		}
-		my_Image.close();
-	}
-	else
-	{
-		std::cout << "Could not open the file";
+		job.colSize = nx;
+		job.spp = ns;
+
+		std::thread t([job, &imageBlocks, ny, &cam, &world, &mutex, &cvResults, &completedThreads]() {
+			CalculateColor(job, imageBlocks, ny, cam, world, mutex, cvResults, completedThreads);
+			});
+		threads.push_back(std::move(t));
 	}
 
-	sf::RenderWindow window(sf::VideoMode(nx, ny), "Test Window");
-	//window.setFramerateLimit(30);
+	// launched jobs. need to build image.
+	// wait for number of jobs = pixel count
+	{
+		std::unique_lock<std::mutex> lock(mutex);
+		cvResults.wait(lock, [&completedThreads, &nThreads] {
+			return completedThreads == nThreads;
+			});
+	}
+
+	for (std::thread& t : threads)
+	{
+		t.join();
+	}
+
+	for (BlockJob job : imageBlocks)
+	{
+		int index = job.rowStart;
+		int colorIndex = 0;
+		for (vec3& col : job.colors)
+		{
+			int colIndex = job.indices[colorIndex];
+			image[colIndex] = col;
+			++colorIndex;
+		}
+	}
+
+	auto timeSpan = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - fulltime);
+	int frameTimeMs = static_cast<int>(timeSpan.count());
+	std::cout << " - time " << frameTimeMs << " ms \n";
+
+
+	std::string filename =
+		"block-x" + std::to_string(nx)
+		+ "-y" + std::to_string(ny)
+		+ "-s" + std::to_string(ns)
+		+ "-" + std::to_string(frameTimeMs) + "sec.ppm";
+
+	std::ofstream fileHandler;
+	fileHandler.open(filename, std::ios::out | std::ios::binary);
+	if (!fileHandler.is_open())
+	{
+		return false;
+	}
+
+	fileHandler << "P3\n" << nx << " " << ny << "\n255\n";
+	for (unsigned int i = 0; i < nx * ny; ++i)
+	{
+		// BGR to RGB
+		// 2 = r;
+		// 1 = g;
+		// 0 = b;
+		fileHandler
+			<< static_cast<int>(255.99f * image[i].e[0]) << " "
+			<< static_cast<int>(255.99f * image[i].e[1]) << " "
+			<< static_cast<int>(255.99f * image[i].e[2]) << "\n";
+	}
+
+	std::cout << "File Saved" << std::endl;
+	fileHandler.close();
+
+
+
+	sf::RenderWindow window(sf::VideoMode(nx, ny), "SFML window");
 	sf::VertexArray pointmap(sf::Points, nx * ny);
 	for (register int a = 0; a < nx * ny; a++) {
 		pointmap[a].position = sf::Vector2f(a % nx, (a / nx) % nx);
-		pointmap[a].color = sf::Color(pixels.at(a)[0], pixels.at(a)[1], pixels.at(a)[2]);
+		pointmap[a].color = sf::Color(255.99f * image[a].e[0], 255.99f * image[a].e[1], 255.99f * image[a].e[2]);
 	}
+	
 
 	while (window.isOpen())
 	{
@@ -189,6 +270,50 @@ int main()
 		window.draw(pointmap);
 		window.display();
 	}
-	delete world;
+
+	delete[] image;
+	return 0;
+
+
+
+	//hittable* world = earth();
+	////hittable* world = two_spheres();
+	//std::vector<vec3> pixels;
+
+	//if (my_Image.is_open()) 
+	//{
+	//	my_Image << "P3\n" << nx << " " << ny << "\n255\n";
+	//	for (int j = ny - 1; j >= 0; j--)
+	//	{
+	//		for (int i = 0; i < nx; i++)
+	//		{
+	//			vec3 col(0, 0, 0);
+	//			for (int s = 0; s < ns; s++) {
+	//				float u = float(i + random_double()) / float(nx);
+	//				float v = float(j + random_double()) / float(ny);
+	//				ray r = cam.get_ray(u, v);
+	//				vec3 p = r.point_at_parameter(2.0);
+	//				col += color(r, world, 0);
+	//			}
+
+	//			col /= float(ns);
+	//			col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+	//			int ir = int(255.99 * col[0]);
+	//			int ig = int(255.99 * col[1]);
+	//			int ib = int(255.99 * col[2]);
+
+	//			vec3 temp(ir, ig, ib);
+	//			//pixels.push_back(temp);
+
+	//			my_Image << ir << " " << ig << " " << ib << "\n";
+	//		}
+	//	}
+	//	my_Image.close();
+	//}
+	//else
+	//{
+	//	std::cout << "Could not open the file";
+	//}
+	//delete world;
 	return 0;
 }
