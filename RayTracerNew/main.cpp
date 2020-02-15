@@ -125,6 +125,16 @@ void CalculateColor(BlockJob job, std::vector<BlockJob>& imageBlocks, int ny, ca
 		cv.notify_one();
 	}
 }
+bool reverse = true;
+
+void GetReverse(std::vector<int> &ir, std::vector<int>& ig, std::vector<int>& ib)
+{
+	std::reverse(ir.begin(), ir.end());
+	std::reverse(ig.begin(), ig.end());
+	std::reverse(ib.begin(), ib.end());
+
+	reverse = false;
+}
 
 int main() 
 {
@@ -226,17 +236,33 @@ int main()
 		return false;
 	}
 
+	std::vector<int> ir;
+	std::vector<int> ig;
+	std::vector<int> ib;
+
 	fileHandler << "P3\n" << nx << " " << ny << "\n255\n";
 	for (unsigned int i = 0; i < nx * ny; ++i)
 	{
-		// BGR to RGB
+		// BGR to RGB Changing hue gives slightly 
 		// 2 = r;
 		// 1 = g;
 		// 0 = b;
+		ir.push_back(static_cast < int>(255.99f * image[i].e[0]));
+		ig.push_back(static_cast < int>(255.99f * image[i].e[1]));
+		ib.push_back(static_cast < int>(255.99f * image[i].e[2]));
+
+	}
+	if (reverse)
+	{
+		GetReverse(ir, ig, ib);
+	}
+
+	for (unsigned int i = 0; i < nx * ny; ++i)
+	{
 		fileHandler
-			<< static_cast<int>(255.99f * image[i].e[0]) << " "
-			<< static_cast<int>(255.99f * image[i].e[1]) << " "
-			<< static_cast<int>(255.99f * image[i].e[2]) << "\n";
+			<< ir.at(i) << " "
+			<< ig.at(i) << " "
+			<< ib.at(i) << "\n";
 	}
 
 	std::cout << "File Saved" << std::endl;
@@ -244,11 +270,11 @@ int main()
 
 
 
-	sf::RenderWindow window(sf::VideoMode(nx, ny), "SFML window");
+	sf::RenderWindow window(sf::VideoMode(nx, ny), "Ray Tracer");
 	sf::VertexArray pointmap(sf::Points, nx * ny);
 	for (register int a = 0; a < nx * ny; a++) {
 		pointmap[a].position = sf::Vector2f(a % nx, (a / nx) % nx);
-		pointmap[a].color = sf::Color(255.99f * image[a].e[0], 255.99f * image[a].e[1], 255.99f * image[a].e[2]);
+		pointmap[a].color = sf::Color(ir.at(a), ig.at(a), ib.at(a));
 	}
 	
 
@@ -276,6 +302,7 @@ int main()
 
 
 
+	// single thread code
 	//hittable* world = earth();
 	////hittable* world = two_spheres();
 	//std::vector<vec3> pixels;
