@@ -2,14 +2,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-struct Vertex
-{
-	vec3 Position;
-	vec3 Normal;
-	vec3 TexCoord;
-	vec3 Color;
-};
-
 bool Model::LoadModel(std::string _modelPath, std::string file, std::unique_ptr<material> mat)
 {
 
@@ -60,4 +52,43 @@ bool Model::LoadModel(std::string _modelPath, std::string file, std::unique_ptr<
 			
 		}
 	}
+
+	if (m_model.size() % 3 != 0)
+	{
+		std::cout << "One of the triangles is not a triangle" << std::endl;
+		exit(1);
+	}
+
+	vec3 min = m_model.at(0).Position;
+	vec3 max = m_model.at(0).Position;
+	for (const auto& vertex : m_model)
+	{
+		min.e[0] = min.e[0] < vertex.Position.e[0] ? min.e[0] : vertex.Position.e[0];
+		min.e[1] = min.e[1] < vertex.Position.e[1] ? min.e[1] : vertex.Position.e[1];
+		min.e[2] = min.e[2] < vertex.Position.e[2] ? min.e[2] : vertex.Position.e[2];
+
+		max.e[0] = max.e[0] < vertex.Position.e[0] ? max.e[0] : vertex.Position.e[0];
+		max.e[1] = max.e[1] < vertex.Position.e[1] ? max.e[1] : vertex.Position.e[1];
+		max.e[2] = max.e[2] < vertex.Position.e[2] ? max.e[2] : vertex.Position.e[2];
+	}
+
+	m_bounding_box = aabb(min, max);
+}
+
+bool Model::hit(const ray& ray, float t_min, float t_max, hit_record& record) const
+{
+	for (size_t i = 0; i < m_model.size(); i += 3)
+	{
+		//bool result = 
+	}
+}
+
+bool Model::rayTriangleIntersect(const ray& ray, float t_min, float t_max, hit_record& record, const Vertex& v0, const Vertex& v1, const Vertex& v2) const
+{
+	vec3 v0v1 = v1.Position - v0.Position;
+	vec3 v0v2 = v2.Position - v0.Position;
+
+	vec3 pvec = ray.direction().cross(ray.direction(), v0v2);
+	//float det = v0v1.
+
 }

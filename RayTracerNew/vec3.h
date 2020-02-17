@@ -27,6 +27,10 @@ public:
     inline vec3& operator*=(const float t);
     inline vec3& operator/=(const float t);
 
+	//vec3 dot(const vec3& v1, const vec3& v2);
+//	vec3 cross(const vec3& v1, const vec3& v2);
+
+	inline vec3 cross(const vec3& v1, const vec3& v2);
     inline float length() const { return sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]); }
     inline float squared_length() const { return e[0] * e[0] + e[1] * e[1] + e[2] * e[2]; }
     inline void make_unit_vector();
@@ -130,6 +134,13 @@ inline vec3& vec3::operator/=(const float t) {
     e[2] *= k;
     return *this;
 }
+
+//inline vec3 vec3::cross(const vec3& v1, const vec3& v2)
+//{
+//	return vec3(v1.e[1] * v2.e[2] - v1.e[2] * v2.e[1],
+//		v1.e[2] * v2.e[0] - v1.e[0] * v2.e[2],
+//		v1.e[0] * v2.e[1] - v1.e[1] * v2.e[0]);
+//}
 
 inline vec3 unit_vector(vec3 v) {
     return v / v.length();
