@@ -145,7 +145,7 @@ int main()
 	int ny = 800;
 	int ns = 10;
 	int pixelCount = nx * ny;
-	hittable* world = random_scene();
+	hittable* world = earth();
 
 	vec3 lookfrom(2, 3, 10);
 	vec3 lookat(0, 0, -1); //original is (0, 0, -1);
