@@ -16,6 +16,8 @@
 #include <atomic>
 #include <future>
 
+Model model0;
+
 vec3 color(const ray& r, hittable* world, int depth) {
 	hit_record rec;
 	if (world->hit(r, 0.001, FLT_MAX, rec)) {
@@ -39,12 +41,18 @@ hittable* earth() {
 	int nx, ny, nn;
 
 	hittable** list = new hittable * [2];
+	Model* models[5];
 
 	unsigned char* tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
 	material* mat = new lambertian(new image_texture(tex_data, nx, ny));
-	texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
+
+	models[0] = new Model("models/", "cube.obj", mat);
+	//models[0]->SetPos(vec3(0, 0, 0));
+	//models[0]->SetRot(vec3(20, 0, 0));
+	models[0]->UpdateModel();
+
 	//list[0] = new sphere(vec3(0, 0, 0), 2, mat);
-	//model0.LoadModel("/", "cube.obj", mat);
+	list[0] = models[0];
 	//list[0] = new Model("models/", "cube.obj", new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
 
 	return new hittable_list(list, 1);
