@@ -4,11 +4,11 @@
 #include "sphere.h"
 #include "hittablelist.h"
 #include "moving_sphere.h"
-#include "float.h"
 #include "camera.h"
 #include "material.h"
 #include "bvh.h"
 #include "stb_image.h"
+#include "Model.h"
 
 #include <thread>
 #include <vector>
@@ -38,9 +38,16 @@ vec3 color(const ray& r, hittable* world, int depth) {
 hittable* earth() {
 	int nx, ny, nn;
 
+	hittable** list = new hittable * [2];
+
 	unsigned char* tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
 	material* mat = new lambertian(new image_texture(tex_data, nx, ny));
-	return new sphere(vec3(0, 0, 0), 2, mat);
+	texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
+	//list[0] = new sphere(vec3(0, 0, 0), 2, mat);
+	//model0.LoadModel("/", "cube.obj", mat);
+	//list[0] = new Model("models/", "cube.obj", new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
+
+	return new hittable_list(list, 1);
 }
 
 hittable* two_spheres() {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
@@ -30,7 +32,7 @@ public:
 	//vec3 dot(const vec3& v1, const vec3& v2);
 //	vec3 cross(const vec3& v1, const vec3& v2);
 
-	inline vec3 cross(const vec3& v1, const vec3& v2);
+	//inline vec3 cross(const vec3& v1, const vec3& v2);
     inline float length() const { return sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]); }
     inline float squared_length() const { return e[0] * e[0] + e[1] * e[1] + e[2] * e[2]; }
     inline void make_unit_vector();
