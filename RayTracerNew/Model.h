@@ -20,7 +20,7 @@ public:
 	Model() = default;
 	Model(std::string _modelPath, std::string file, material* mat);
 	virtual bool hit(const ray& ray, float t_min, float t_max, hit_record& record)const;
-	virtual bool bounding_box(float t0, float t1, aabb& box) const { box = m_bounding_box; return true; }
+	virtual bool bounding_box(float t0, float t1, aabb& box) const;
 
 	//virtual bool bounding_box(float t0, float t1, aabb& box) const;
 	bool rayTriangleIntersect(const ray& ray, float t_min, float t_max, hit_record& record, const Vertex& v0, const Vertex& v1, const Vertex& v2)const;
@@ -34,7 +34,6 @@ public:
 
 	void UpdateModel();
 
-	aabb m_bounding_box;
 	Matrix4 m_worldMatrix;
 	//std::unique_ptr<material> m_material;
 	vec3 m_pos;
@@ -104,21 +103,6 @@ Model::Model(std::string _modelPath, std::string file, material* mat)
 		exit(1);
 	}
 
-	vec3 min = m_model.at(0).Position;
-	vec3 max = m_model.at(0).Position;
-
-	for (const auto& vertex : m_model)
-	{
-		min.e[0] = min.e[0] < vertex.Position.e[0] ? min.e[0] : vertex.Position.e[0];
-		min.e[1] = min.e[1] < vertex.Position.e[1] ? min.e[1] : vertex.Position.e[1];
-		min.e[2] = min.e[2] < vertex.Position.e[2] ? min.e[2] : vertex.Position.e[2];
-
-		max.e[0] = max.e[0] < vertex.Position.e[0] ? max.e[0] : vertex.Position.e[0];
-		max.e[1] = max.e[1] < vertex.Position.e[1] ? max.e[1] : vertex.Position.e[1];
-		max.e[2] = max.e[2] < vertex.Position.e[2] ? max.e[2] : vertex.Position.e[2];
-	}
-
-	m_bounding_box = aabb(min, max);
 }
 
 bool Model::hit(const ray& ray, float t_min, float t_max, hit_record& record) const
@@ -128,6 +112,29 @@ bool Model::hit(const ray& ray, float t_min, float t_max, hit_record& record) co
 		bool result = rayTriangleIntersect(ray, t_min, t_max, record, m_model.at(i), m_model.at(i + 1), m_model.at(i + 2));
 		if (result) { return true; }
 	}
+}
+
+bool Model::bounding_box(float t0, float t1, aabb& box) const
+{
+	vec3 minVertex = vec3(FLT_MAX, FLT_MAX, FLT_MAX);
+	vec3 maxVertex = vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+	//Loop through the vertices describing the bounding box
+	for (const auto& Vert : m_model)
+	{
+		//Get the smallest vertex 
+		minVertex.e[0] = minVertex.e[0] < Vert.Position.e[0] ? minVertex.e[0] : Vert.Position.e[0];    // Find smallest x value in model
+		minVertex.e[1] = minVertex.e[1] < Vert.Position.e[1] ? minVertex.e[1] : Vert.Position.e[1];     // Find smallest y value in model
+		minVertex.e[2] = minVertex.e[2] < Vert.Position.e[2] ? minVertex.e[2] : Vert.Position.e[2];    // Find smallest z value in model
+
+		//Get the largest vertex 
+		maxVertex.e[0] = minVertex.e[0] > Vert.Position.e[0] ? minVertex.e[0] : Vert.Position.e[0];    // Find largest x value in model
+		maxVertex.e[1] = minVertex.e[1] > Vert.Position.e[1] ? minVertex.e[1] : Vert.Position.e[1];    // Find largest y value in model
+		maxVertex.e[2] = minVertex.e[2] > Vert.Position.e[2] ? minVertex.e[2] : Vert.Position.e[2];    // Find largest z value in model
+	}
+	//create box
+	box = aabb(minVertex, maxVertex);
+	return true;
 }
 
 bool Model::rayTriangleIntersect(const ray& ray, float t_min, float t_max, hit_record& record, const Vertex& v0, const Vertex& v1, const Vertex& v2) const
@@ -190,6 +197,6 @@ void Model::UpdateModel()
 		max.e[2] = max.e[2] > m_model.at(i).Position.e[2] ? max.e[2] : m_model.at(i).Position.e[2];
 	}
 
-	m_bounding_box = aabb(min, max);
+	//box = aabb(min, max);
 }
 #endif // !MODELH

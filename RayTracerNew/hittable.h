@@ -26,10 +26,8 @@ struct hit_record
 class hittable {
 public:
     virtual bool hit(const ray& r, float t_min, float t_max, hit_record& rec) const = 0;
-    virtual bool bounding_box(float t0, float t1, aabb& box) const { box = m_bounding_box; return true; }
+    virtual bool bounding_box(float t0, float t1, aabb& box) const = 0;
 
-protected:
-    aabb m_bounding_box;
 };
 
 #endif
