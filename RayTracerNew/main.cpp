@@ -40,22 +40,29 @@ vec3 color(const ray& r, hittable* world, int depth) {
 hittable* earth() {
 	int nx, ny, nn;
 
-	hittable** list = new hittable * [2];
+	hittable** list = new hittable * [3];
 	Model* models[5];
 
-	unsigned char* tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
+	unsigned char* tex_data = stbi_load("models/Doge_Texture.jpg", &nx, &ny, &nn, 0);
 	material* mat = new lambertian(new image_texture(tex_data, nx, ny));
+	material* mat2 = new lambertian(new constant_texture(vec3(0, 0, 0)));
 
-	models[0] = new Model("models/", "cube.obj", mat);
+	models[0] = new Model("models/", "dege.obj", mat);
+	models[1] = new Model("models/", "nose.obj", mat2);
+
+	texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
 	//models[0]->SetPos(vec3(0, 0, 0));
 	//models[0]->SetRot(vec3(20, 0, 0));
-	models[0]->UpdateModel();
+	//models[0]->UpdateModel();
 
 	//list[0] = new sphere(vec3(0, 0, 0), 2, mat);
 	list[0] = models[0];
+	list[1] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(checker));
+	list[2] = models[1];
+
 	//list[0] = new Model("models/", "cube.obj", new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
 
-	return new hittable_list(list, 1);
+	return new bvh_node(list, 3,0,1);
 }
 
 hittable* two_spheres() {
@@ -154,7 +161,7 @@ void GetReverse(std::vector<int> &ir, std::vector<int>& ig, std::vector<int>& ib
 int main() 
 {
 
-	float fov = 20.0f;
+	float fov = 60.0f;
 	//std::ofstream my_Image("image.ppm");
 	int nx = 1200;
 	int ny = 800;
@@ -162,10 +169,10 @@ int main()
 	int pixelCount = nx * ny;
 	hittable* world = earth();
 
-	vec3 lookfrom(2, 3, 10);
+	vec3 lookfrom(-10, 10, 20);
 	vec3 lookat(0, 0, -1); //original is (0, 0, -1);
 	float dist_to_focus = 10.0f;
-	float aperture = 0.1f;
+	float aperture = 0.0f;
 
 	vec3* image = new vec3[pixelCount];
 	memset(&image[0], 0, pixelCount * sizeof(vec3));

@@ -407,7 +407,7 @@ public:
 			temp_vec.e[i] = i < 3 ? vec.e[i] : 1;
 		}
 
-		for (size_t i = 0; i < 4 && i < Matrix4Data.size(); i++)
+		for (size_t i = 0; i < 3 && i < Matrix4Data.size(); i++)
 		{
 			for (size_t j = 0; j < Matrix4Data.front().size(); j++)
 			{
