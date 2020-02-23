@@ -18,9 +18,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Model.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vec3.h">
@@ -71,10 +68,10 @@
     <ClInclude Include="Model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="matrix.h">
+    <ClInclude Include="rectangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vec4.h">
+    <ClInclude Include="box.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

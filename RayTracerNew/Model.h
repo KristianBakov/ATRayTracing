@@ -6,7 +6,6 @@
 #include "tiny_obj_loader.h"
 
 #include "aabb.h"
-#include "matrix.h"
 
 struct Vertex
 {
@@ -25,20 +24,6 @@ public:
 	//virtual bool bounding_box(float t0, float t1, aabb& box) const;
 	bool rayTriangleIntersect(const ray& ray, float t_min, float t_max, hit_record& record, const Vertex& v0, const Vertex& v1, const Vertex& v2)const;
 
-	void SetPos(const vec3& pos) { m_pos = pos; }
-	void SetScale(const vec3& scale) { m_scale = scale; }
-	void SetRot(const vec3& rot) { m_rot = rot; }
-	vec3 GetPos() { return m_pos; }
-	vec3 GetScale() { return m_scale; }
-	vec3 GetRot() { return m_rot; }
-
-	void UpdateModel();
-
-	Matrix4 m_worldMatrix;
-	//std::unique_ptr<material> m_material;
-	vec3 m_pos;
-	vec3 m_scale = vec3(1, 1, 1);
-	vec3 m_rot;
 	std::vector<Vertex> m_model;
 	material* m_material;
 	
@@ -48,7 +33,7 @@ Model::Model(std::string _modelPath, std::string file, material* mat)
 {
 
 	m_material = mat;
-	m_worldMatrix.SetIdentityMatrix();
+
 	
 	//std::string inputfile = "cornell_box.obj";
 	tinyobj::attrib_t attrib;
@@ -171,32 +156,5 @@ bool Model::rayTriangleIntersect(const ray& ray, float t_min, float t_max, hit_r
 	}
 	return false;
 
-}
-
-void Model::UpdateModel()
-{
-	m_worldMatrix.TranslateByVector(m_pos);
-	//m_worldMatrix.ScaleByVector(m_scale);
-
-	//m_worldMatrix.PitchMatrix(m_rot.data[pitch]);
-	//m_worldMatrix.YawMatrix(m_rot.data[yaw]);
-	//m_worldMatrix.RollMatrix(m_rot.data[roll]);
-
-	vec3 min = m_model.at(0).Position;
-	vec3 max = m_model.at(0).Position;
-	for (size_t i = 0; i < m_model.size(); i++)
-	{
-		m_model.at(i).Position = m_worldMatrix.TransformVector(m_model.at(i).Position);
-
-		min.e[0] = min.e[0] < m_model.at(i).Position.e[0] ? min.e[0] : m_model.at(i).Position.e[0];
-		min.e[1] = min.e[1] < m_model.at(i).Position.e[1] ? min.e[1] : m_model.at(i).Position.e[1];
-		min.e[2] = min.e[2] < m_model.at(i).Position.e[2] ? min.e[2] : m_model.at(i).Position.e[2];
-					   							 							 		  
-		max.e[0] = max.e[0] > m_model.at(i).Position.e[0] ? max.e[0] : m_model.at(i).Position.e[0];
-		max.e[1] = max.e[1] > m_model.at(i).Position.e[1] ? max.e[1] : m_model.at(i).Position.e[1];
-		max.e[2] = max.e[2] > m_model.at(i).Position.e[2] ? max.e[2] : m_model.at(i).Position.e[2];
-	}
-
-	//box = aabb(min, max);
 }
 #endif // !MODELH

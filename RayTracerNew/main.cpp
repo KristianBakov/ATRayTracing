@@ -4,7 +4,9 @@
 #include "sphere.h"
 #include "hittablelist.h"
 #include "moving_sphere.h"
+#include "rectangle.h"
 #include "camera.h"
+#include "box.h"
 #include "material.h"
 #include "bvh.h"
 #include "stb_image.h"
@@ -16,31 +18,44 @@
 #include <atomic>
 #include <future>
 
-Model model0;
+//vec3 color(const ray& r, hittable* world, int depth) {
+//	hit_record rec;
+//	if (world->hit(r, 0.001, FLT_MAX, rec)) {
+//		ray scattered;
+//		vec3 attenuation;
+//		if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
+//			return attenuation * color(scattered, world, depth + 1);
+//		}
+//		else {
+//			return vec3(0, 0, 0);
+//		}
+//	}
+//	else {
+//		vec3 unit_direction = unit_vector(r.direction());
+//		float t = 0.5 * (unit_direction.y() + 1.0);
+//		return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+//	}
+//}
 
 vec3 color(const ray& r, hittable* world, int depth) {
 	hit_record rec;
 	if (world->hit(r, 0.001, FLT_MAX, rec)) {
 		ray scattered;
 		vec3 attenuation;
-		if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
-			return attenuation * color(scattered, world, depth + 1);
-		}
-		else {
-			return vec3(0, 0, 0);
-		}
+		vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+		if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered))
+			return emitted + attenuation * color(scattered, world, depth + 1);
+		else
+			return emitted;
 	}
-	else {
-		vec3 unit_direction = unit_vector(r.direction());
-		float t = 0.5 * (unit_direction.y() + 1.0);
-		return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-	}
+	else
+		return vec3(0, 0, 0);
 }
 
 hittable* earth() {
 	int nx, ny, nn;
 
-	hittable** list = new hittable * [3];
+	hittable** list = new hittable * [5];
 	Model* models[5];
 
 	unsigned char* tex_data = stbi_load("models/Doge_Texture.jpg", &nx, &ny, &nn, 0);
@@ -51,18 +66,22 @@ hittable* earth() {
 	models[1] = new Model("models/", "nose.obj", mat2);
 
 	texture* checker = new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)), new constant_texture(vec3(0.9, 0.9, 0.9)));
-	//models[0]->SetPos(vec3(0, 0, 0));
-	//models[0]->SetRot(vec3(20, 0, 0));
-	//models[0]->UpdateModel();
 
 	//list[0] = new sphere(vec3(0, 0, 0), 2, mat);
-	list[0] = models[0];
+	//list[0] = models[0];
+	list[0] = new translate(
+		new rotate_y(new Model("models/", "dege.obj", mat), 0),
+		vec3(0, 0, -1));
 	list[1] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(checker));
 	list[2] = models[1];
+	list[3] = new sphere(vec3(-5, 7, 0), 2,
+		new diffuse_light(new constant_texture(vec3(4, 4, 4))));
+	list[4] = new xy_rect(3, 5, 1, 3, 2,
+		new diffuse_light(new constant_texture(vec3(4, 4, 4))));
 
 	//list[0] = new Model("models/", "cube.obj", new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
 
-	return new bvh_node(list, 3,0,1);
+	return new bvh_node(list, 5, 0, 1);
 }
 
 hittable* two_spheres() {
@@ -108,6 +127,31 @@ hittable* random_scene() {
 
 	//return new hittable_list(list,i);
 	return new bvh_node(list, i, 0.0, 1.0);
+}
+
+hittable* cornell_box() {
+	hittable** list = new hittable * [8];
+	int i = 0;
+	material* red = new lambertian(new constant_texture(vec3(0.65, 0.05, 0.05)));
+	material* white = new lambertian(new constant_texture(vec3(0.73, 0.73, 0.73)));
+	material* green = new lambertian(new constant_texture(vec3(0.12, 0.45, 0.15)));
+	material* light = new diffuse_light(new constant_texture(vec3(15, 15, 15)));
+
+	list[i++] = new flip_normals(new yz_rect(0, 555, 0, 555, 555, green));
+	list[i++] = new yz_rect(0, 555, 0, 555, 0, red);
+	list[i++] = new xz_rect(213, 343, 227, 332, 554, light);
+	list[i++] = new flip_normals(new xz_rect(0, 555, 0, 555, 555, white));
+	list[i++] = new xz_rect(0, 555, 0, 555, 0, white);
+	list[i++] = new flip_normals(new xy_rect(0, 555, 0, 555, 555, white));
+
+	list[i++] = new translate(
+		new rotate_y(new box(vec3(0, 0, 0), vec3(165, 165, 165), white), -18),
+		vec3(130, 0, 65));
+	list[i++] = new translate(
+		new rotate_y(new box(vec3(0, 0, 0), vec3(165, 330, 165), white), 15),
+		vec3(265, 0, 295));
+
+	return new bvh_node(list, i,0 ,1);
 }
 
 struct BlockJob
@@ -161,16 +205,18 @@ void GetReverse(std::vector<int> &ir, std::vector<int>& ig, std::vector<int>& ib
 int main() 
 {
 
-	float fov = 60.0f;
+	float fov = 40.0f;
 	//std::ofstream my_Image("image.ppm");
-	int nx = 1200;
-	int ny = 800;
-	int ns = 10;
+	int nx = 600;
+	int ny = 400;
+	int ns = 150;
 	int pixelCount = nx * ny;
-	hittable* world = earth();
+	hittable* world = cornell_box();
 
-	vec3 lookfrom(-10, 10, 20);
-	vec3 lookat(0, 0, -1); //original is (0, 0, -1);
+	//vec3 lookfrom(-10, 10, 20);
+	//vec3 lookat(0, 0, -1); //original is (0, 0, -1);
+	vec3 lookfrom(278, 278, -800);
+	vec3 lookat(278, 278, 0);
 	float dist_to_focus = 10.0f;
 	float aperture = 0.0f;
 
@@ -179,6 +225,7 @@ int main()
 
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
 		float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
+
 
 	//camera cam(lookfrom, lookat, vec3(0, 1, 0), fov,
 	//	float(nx) / float(ny), aperture, dist_to_focus, 0.0f, 1.0f);
